@@ -18,7 +18,7 @@ interface CepInfo {
   siafi: string
 }
 
-const cepInfoArray: CepInfo[] = []
+let cepInfoArray: CepInfo[] = []
 
 app.use(express.json())
 
@@ -35,10 +35,15 @@ app.get('/weather', async (request, response: express.Response) => {
   }
 })
 
-async function getCep(requestBody: number) {
+async function getCep(requestBody: number | string) {
   const res = await fetch(`https://viacep.com.br/ws/${requestBody}/json/`)
   const dataJson = await res.json()
-  return cepInfoArray.push(dataJson)
+  const existingCepIndex = cepInfoArray.findIndex(
+    (cep) => cep.cep.replace('-', '') === dataJson.cep.replace('-', ''),
+  )
+  if (existingCepIndex === -1) {
+    cepInfoArray.push(dataJson)
+  }
 }
 
 app.get(
@@ -67,7 +72,7 @@ app.post(
   async (request: express.Request, response: express.Response) => {
     try {
       const body = request.body
-      await getCep(body.ceps)
+      await getCep(body.cep)
       response.json(cepInfoArray)
       response.status(200)
     } catch (err) {
@@ -76,6 +81,36 @@ app.post(
     }
   },
 )
+
+app.delete('/cep/:cep', (request, response) => {
+  try {
+    const cepParams: string = request.params.cep
+    const cepIndex: number = cepInfoArray.findIndex(
+      (cep) => cep.cep.replace('-', '') === cepParams,
+    )
+    if (cepIndex !== -1) {
+      const cepToDelete = cepInfoArray.splice(cepIndex, 1)
+      response.status(200).json(cepToDelete)
+    }
+  } catch (error) {
+    console.error(error)
+    response.status(400).end()
+  }
+})
+
+app.put('/cep/:cep', async (request, response) => {
+  try {
+    const paramsCep = request.params.cep
+    const body = request.body
+    cepInfoArray = cepInfoArray.filter(
+      (cep) => cep.cep.replace('-', '') !== paramsCep,
+    )
+    await getCep(body.cep)
+    response.status(200).json(cepInfoArray)
+  } catch (error) {
+    console.error(error)
+  }
+})
 
 app.listen(port, () => {
   console.log(`server rodando na porta ${port}`)
