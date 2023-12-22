@@ -3,7 +3,6 @@ import 'dotenv/config'
 
 const app = express()
 const port = process.env.PORT
-const city: string = 'Paraiba'
 
 interface CepInfo {
   cep: string
@@ -16,14 +15,16 @@ interface CepInfo {
   gia: string
   ddd: string
   siafi: string
+  weather?: string
 }
 
 let cepInfoArray: CepInfo[] = []
 
 app.use(express.json())
 
-app.get('/weather', async (request, response: express.Response) => {
+app.get('/cep/weather/:cep', async (request, response: express.Response) => {
   try {
+    const city = request.params.cep
     const res = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPEN_WEATHER_KEY}`,
     )
@@ -46,6 +47,14 @@ async function getCep(requestBody: number | string) {
   }
 }
 
+async function weather(city: string) {
+  const res = await fetch(
+    `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPEN_WEATHER_KEY}`,
+  )
+  const dataJson = await res.json()
+  return dataJson.main
+}
+
 app.get(
   '/cep/:cep',
   async (request: express.Request, response: express.Response) => {
@@ -55,6 +64,14 @@ app.get(
       const infoCep = cepInfoArray.find(
         (cep) => cep.cep.replace('-', '') === cepParams,
       )
+      if (infoCep !== undefined) {
+        await weather(infoCep.localidade)
+
+        if (!infoCep.weather) {
+          const weatherData = await weather(infoCep.localidade)
+          infoCep.weather = weatherData
+        }
+      }
       response.json(infoCep)
     } catch (error) {
       console.error(error)
